@@ -1,113 +1,116 @@
-# Django Custom Authentication and Authorization API
+# API Аутентификации и Авторизации на Django
 
-[![Django CI](https://github.com/USERNAME/REPOSITORY/actions/workflows/ci.yml/badge.svg)](https://github.com/USERNAME/REPOSITORY/actions/workflows/ci.yml)
+Этот проект представляет собой бэкенд-приложение на Django + DRF, реализующее кастомную систему аутентификации и авторизации. Главная особенность — собственная гибкая RBAC (Role-Based Access Control) система управления правами на уровне базы данных, без жесткой привязки к стандартным группам Django.
 
-This project is a custom authentication and authorization (RBAC) API built with Django and Django Rest Framework. It provides a flexible, role-based access control system at the database level, designed to be modular and secure.
+*(Комментарии внутри кода написаны на русском языке для пояснения логики реализации, сама документация и названия переменных — на английском).*
 
-*(Этот проект был подготовлен в качестве демонстрации. Вся документация на английском, но комментарии в коде на русском языке для лучшего понимания внутренней логики.)*
+## Архитектура прав доступа
 
-## Access Control Architecture
+Мы выбрали модель RBAC (Role-Based Access Control) за её гибкость и масштабируемость. Это позволяет очень точно настраивать, кто и что может делать в системе.
 
-The access control system is based on a Role-Based Access Control (RBAC) model. This design was chosen for its flexibility and scalability, allowing for granular control over permissions.
+Схема базы данных состоит из пяти основных моделей:
+- **`Resource`**: Сущность, к которой идет обращение (например, "SecretDocument" или "UserProfile").
+- **`Action`**: Действие, которое можно совершить (например, "read", "write", "delete").
+- **`Permission`**: Связка Ресурса и Действия (например, право "читать SecretDocument").
+- **`Role`**: Набор Разрешений (Permission), определяющий роль человека (например, "Admin", "Manager", "Viewer").
+- **`CustomUser`**: Модель пользователя. Пользователю назначается одна или несколько Ролей, от которых он наследует все права.
 
-The schema consists of five core models:
-- **`Resource`**: Represents an entity being accessed (e.g., "SecretDocument", "UserProfile").
-- **`Action`**: Represents an operation that can be performed (e.g., "read", "write", "delete").
-- **`Permission`**: A combination of a `Resource` and an `Action` (e.g., the permission to "read SecretDocument").
-- **`Role`**: A collection of `Permission`s that defines a set of capabilities (e.g., "Admin", "DocumentViewer").
-- **`CustomUser`**: The user model, which can be assigned one or more `Role`s, thereby inheriting their permissions.
+**Как это работает:**
+При запросе система проверяет, есть ли у пользователя хотя бы одна роль, которая содержит необходимое разрешение для конкретного действия над ресурсом. Суперпользователи (администраторы) по умолчанию имеют доступ ко всему.
 
-A user's ability to perform an action is determined by checking if any of their assigned roles contain the required permission. Superusers are granted all permissions implicitly.
+## Установка и запуск
 
-## Getting Started
+Проект полностью завернут в Docker, так что развернуть его можно одной командой.
 
-The application is fully containerized using Docker and Docker Compose for easy setup and deployment.
-
-**Prerequisites:**
+**Требования:**
 - Docker
 - Docker Compose
 
-### 1. Clone the Repository
-First, clone the project to your local machine. Remember to replace `USERNAME/REPOSITORY` with your actual GitHub username and repository name to make the CI badge work.
+### 1. Клонирование репозитория
+Склонируйте проект к себе на машину:
+```bash
+git clone https://github.com/USERNAME/REPOSITORY.git
+cd REPOSITORY
+```
 
-### 2. Create Environment File
-The project uses a `.env` file for configuration. Create one by copying the example file:
+### 2. Настройка окружения
+Проект использует `.env` файл для конфигурации. Создайте его из примера:
 ```bash
 cp .env.example .env
 ```
-The default values in `.env.example` are suitable for local development. You should change `SECRET_KEY` for a production environment.
+Значения по умолчанию в `.env.example` вполне подходят для локальной разработки. Для продакшена не забудьте сменить `SECRET_KEY`.
 
-### 3. Build and Run
-Execute the following command from the project root directory:
+### 3. Сборка и запуск
+Выполните команду в корне проекта:
 ```bash
 docker-compose up --build -d
 ```
-This command will:
-- Build the Docker images for the Django application and PostgreSQL.
-- Start the services in detached mode.
-- Automatically apply database migrations.
-- Seed the database with initial data (roles, permissions, and an admin user) via the `seed_db` management command.
+Эта команда сделает всё сама:
+- Соберет Docker-образы для Django и PostgreSQL.
+- Запустит контейнеры в фоновом режиме.
+- Накатит миграции базы данных.
+- **Автоматически заполнит БД тестовыми данными** (роли, права, админ) через скрипт `seed_db`.
 
-The API will then be available at `http://localhost:8000`.
+После этого API будет доступно по адресу `http://localhost:8000`.
 
-### Initial Admin User
-The database seeding process creates a superuser with the following credentials:
+### Тестовый Админ
+При первом запуске скрипт сидинга создает суперюзера, чтобы вы могли сразу проверить работу:
 - **Email**: `admin@example.com`
 - **Password**: `adminpassword`
 
-## API Documentation
-The API is self-documented using `drf-yasg`, which provides Swagger and ReDoc interfaces.
+## Документация API
+К проекту прикручен `drf-yasg`, так что полная спецификация доступна в браузере:
 - **Swagger UI**: `http://localhost:8000/swagger/`
 - **ReDoc**: `http://localhost:8000/redoc/`
 
-## Running Tests
-The project includes a comprehensive test suite. To run the tests, execute the following command:
+## Запуск тестов
+В проекте есть набор тестов. Чтобы прогнать их внутри контейнера, используйте команду:
 ```bash
 docker-compose exec web python src/manage.py test core
 ```
-This runs the tests inside the running `web` container, ensuring the test environment is identical to the application's runtime. The CI pipeline configured in `.github/workflows/ci.yml` also runs these tests automatically on every push and pull request to the `main` branch.
+Это запустит тесты в том же окружении, где работает приложение. CI пайплайн (в `.github/workflows/ci.yml`) также гоняет эти тесты при каждом пуше в `main`.
 
-## API Usage Examples
-The following `cURL` commands demonstrate how to interact with the API.
+## Примеры использования (cURL)
+Ниже несколько примеров, как дергать API через консоль.
 
-#### 1. Register a New User
+#### 1. Регистрация нового пользователя
 ```bash
 curl -X POST http://localhost:8000/api/register/ \
 -H "Content-Type: application/json" \
 -d '{"email": "newuser@example.com", "password": "strongpassword", "password2": "strongpassword"}'
 ```
 
-#### 2. Log In
-Returns `access` and `refresh` tokens.
+#### 2. Логин (Вход)
+В ответ придут `access` и `refresh` токены.
 ```bash
 curl -X POST http://localhost:8000/api/login/ \
 -H "Content-Type: application/json" \
 -d '{"email": "newuser@example.com", "password": "strongpassword"}'
 ```
 
-#### 3. Access a Protected Resource
-Use the `access` token from the login response.
+#### 3. Доступ к защищенному ресурсу
+Подставьте полученный `access` токен.
 ```bash
-ACCESS_TOKEN="your_access_token_here"
+ACCESS_TOKEN="ваш_токен_тут"
 curl -X GET http://localhost:8000/api/secret/ \
 -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-#### 4. Log Out
-This blacklists the refresh token. The request must be authenticated.
+#### 4. Логаут (Выход)
+Эта ручка добавляет refresh-токен в черный список. Требует авторизации.
 ```bash
-ACCESS_TOKEN="your_access_token_here"
-REFRESH_TOKEN="your_refresh_token_here"
+ACCESS_TOKEN="ваш_access_токен"
+REFRESH_TOKEN="ваш_refresh_токен"
 curl -X POST http://localhost:8000/api/logout/ \
 -H "Authorization: Bearer $ACCESS_TOKEN" \
 -H "Content-Type: application/json" \
 -d '{"refresh": "'$REFRESH_TOKEN'"}'
 ```
 
-#### 5. Manage Roles (Admin Only)
-Log in with the pre-seeded admin user to get an admin access token.
+#### 5. Управление ролями (Только Админ)
+Зайдите под админом (см. раздел "Тестовый Админ"), получите токен и дергайте ручки управления правами.
 ```bash
-ADMIN_ACCESS_TOKEN="your_admin_access_token_here"
+ADMIN_ACCESS_TOKEN="токен_админа"
 curl -X GET http://localhost:8000/api/admin/roles/ \
 -H "Authorization: Bearer $ADMIN_ACCESS_TOKEN"
 ```
